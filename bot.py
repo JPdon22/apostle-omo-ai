@@ -17,69 +17,111 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 from sermons import sermons
 
+
+# =========================
+# BOT TOKEN
+# =========================
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
+
+# =========================
+# AI MODEL (LOAD FIRST)
+# =========================
+model = SentenceTransformer("all-MiniLM-L6-v2", cache_folder="/tmp")
+
+
+# =========================
+# SERMON STORE + EMBEDDINGS
+# =========================
+sermon_store = sermons.copy()
+
+for sermon in sermon_store:
+    text = sermon["title"] + " " + sermon["description"]
+    sermon["embedding"] = model.encode(text)
+
+
+# =========================
+# WELCOME MESSAGE
+# =========================
 WELCOME_MESSAGE = """
 🙏 Welcome to Apostle Omo's A.I.
 
-Describe what you are going through, and I will recommend relevant teachings from Apostle Omorogbe Aimiuwu.
+Describe what you're going through and I’ll recommend relevant teachings.
 
-You can ask things like:
-
-• I need favour in my business
-• I feel emotionally down
-• I need restoration after failure
-• I need breakthrough in my career
-• I want to grow spiritually
-• I need help with commitment in prayer
-
-Simply send your message in your own words.
+Examples:
+• I need favour in business
+• I feel stuck in life
+• I need breakthrough
+• I feel spiritually down
+• I need restoration
 """
 
 
+# =========================
+# HYBRID MATCHING ENGINE
+# =========================
 def find_matching_sermons(user_message: str):
-    """
-    Returns sermons with the highest matching score.
-    Longer keyword phrases receive higher scores.
-    """
+    clean_msg = re.sub(r"[^\w\s]", " ", user_message.lower())
+    msg_tokens = set(clean_msg.split())
 
-    cleaned_message = re.sub(r"[^\w\s]", " ", user_message.lower())
-    cleaned_message = re.sub(r"\s+", " ", cleaned_message).strip()
+    user_vec = model.encode(user_message)
 
-    scored_sermons = []
+    scored = []
 
-    for sermon in sermons:
-        score = 0
+    for sermon in sermon_store:
+
+        # ---------------- KEYWORD SCORE ----------------
+        keyword_score = 0
 
         for keyword in sermon["keywords"]:
-            keyword = keyword.lower().strip()
+            kw = keyword.lower()
 
-            if keyword in cleaned_message:
-                score += len(keyword.split())
+            if kw in clean_msg:
+                keyword_score += 2
+            else:
+                kw_tokens = set(kw.split())
+                keyword_score += len(kw_tokens & msg_tokens) * 0.3
 
-        if score > 0:
-            scored_sermons.append((score, sermon))
+        keyword_score = min(keyword_score / 5, 1)
 
-    if not scored_sermons:
+        # ---------------- SEMANTIC SCORE ----------------
+        semantic_score = cosine_similarity(
+            [user_vec],
+            [sermon["embedding"]]
+        )[0][0]
+
+        # ---------------- FINAL SCORE ----------------
+        final_score = (0.45 * keyword_score) + (0.55 * semantic_score)
+
+        scored.append((final_score, sermon))
+
+    if not scored:
         return []
 
-    highest_score = max(score for score, _ in scored_sermons)
+    scored.sort(reverse=True, key=lambda x: x[0])
 
-    best_matches = [
-        sermon
-        for score, sermon in scored_sermons
-        if score == highest_score
-    ]
+    top_score = scored[0][0]
 
-    random.shuffle(best_matches)
+    if top_score < 0.35:
+        return []
 
-    return best_matches[:3]
+    best = [s for score, s in scored if abs(score - top_score) < 0.03]
+
+    random.shuffle(best)
+
+    return best[:3]
 
 
+# =========================
+# START COMMAND
+# =========================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(WELCOME_MESSAGE)
 
 
+# =========================
+# MESSAGE HANDLER
+# =========================
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_message = update.message.text
 
@@ -106,8 +148,8 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         response = (
             "🙏 I couldn’t find an exact match for that.\n\n"
             "Try describing it differently like:\n"
-            "• I need breakthrough in my career\n"
             "• I feel stuck in life\n"
+            "• I need breakthrough\n"
             "• I need favour in business\n"
             "• I need spiritual growth\n"
         )
@@ -115,6 +157,9 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(response)
 
 
+# =========================
+# APP SETUP
+# =========================
 app = ApplicationBuilder().token(BOT_TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
@@ -125,5 +170,5 @@ print("Apostle Omo's A.I is running...")
 app.run_polling(
     poll_interval=3,
     timeout=30,
-    bootstrap_retries=5,
+    bootstrap_retries=5
 )
