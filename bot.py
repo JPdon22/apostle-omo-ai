@@ -1,46 +1,117 @@
+import os
+import random
+import re
+
 from telegram import Update
 from telegram.ext import (
     ApplicationBuilder,
     MessageHandler,
     CommandHandler,
+    ContextTypes,
     filters,
-    ContextTypes
 )
 
 from sermons import sermons
-import os
+
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        """
-Welcome to Apostle Omo's A.I
+WELCOME_MESSAGE = """
+🙏 Welcome to Apostle Omo's A.I.
 
-Tell me what kind of message you need and I’ll recommend teachings for you.
+Describe what you are going through, and I will recommend relevant teachings from Apostle Omorogbe Aimiuwu.
+
+You can ask things like:
+
+• I need favour in my business
+• I feel emotionally down
+• I need restoration after failure
+• I need breakthrough in my career
+• I want to grow spiritually
+• I need help with commitment in prayer
+
+Simply send your message in your own words.
 """
-    )
 
-async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_message = update.message.text.lower()
 
-    found_sermons = []
+def find_matching_sermons(user_message: str):
+    """
+    Returns sermons with the highest matching score.
+    Longer keyword phrases receive higher scores.
+    """
+
+    cleaned_message = re.sub(r"[^\w\s]", " ", user_message.lower())
+    cleaned_message = re.sub(r"\s+", " ", cleaned_message).strip()
+
+    scored_sermons = []
 
     for sermon in sermons:
+        score = 0
+
         for keyword in sermon["keywords"]:
-            if keyword in user_message:
-                found_sermons.append(sermon)
+            keyword = keyword.lower().strip()
 
-    if found_sermons:
-        response = "Here are some recommended messages:\n\n"
+            if keyword in cleaned_message:
+                score += len(keyword.split())
 
-        for sermon in found_sermons:
-            response += f"{sermon['title']}\n"
+        if score > 0:
+            scored_sermons.append((score, sermon))
+
+    if not scored_sermons:
+        return []
+
+    highest_score = max(score for score, _ in scored_sermons)
+
+    best_matches = [
+        sermon
+        for score, sermon in scored_sermons
+        if score == highest_score
+    ]
+
+    random.shuffle(best_matches)
+
+    return best_matches[:3]
+
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(WELCOME_MESSAGE)
+
+
+async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_message = update.message.text
+
+    if not user_message:
+        return
+
+    matched_sermons = find_matching_sermons(user_message)
+
+    if matched_sermons:
+        response = "📖 Here are some recommended messages for you:\n\n"
+
+        seen_links = set()
+
+        for sermon in matched_sermons:
+            if sermon["link"] in seen_links:
+                continue
+
+            seen_links.add(sermon["link"])
+
+            response += f"✨ {sermon['title']}\n"
             response += f"{sermon['link']}\n\n"
 
     else:
-        response = "Sorry, I couldn't find a matching message yet."
+        response = (
+            "🙏 I couldn't find a specific message for that yet.\n\n"
+            "Try describing your situation differently.\n\n"
+            "For example:\n"
+            "• I need favour in business\n"
+            "• I feel discouraged\n"
+            "• I need spiritual growth\n"
+            "• I need restoration\n"
+            "• I need breakthrough"
+        )
 
     await update.message.reply_text(response)
+
 
 app = ApplicationBuilder().token(BOT_TOKEN).build()
 
@@ -52,5 +123,5 @@ print("Apostle Omo's A.I is running...")
 app.run_polling(
     poll_interval=3,
     timeout=30,
-    bootstrap_retries=5
+    bootstrap_retries=5,
 )
