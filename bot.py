@@ -103,7 +103,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "🙏 I couldn't find a specific message for that yet.\n\n"
             "Try describing your situation differently.\n\n"
             "For example:\n"
-            "• I need favour in business\n"
+            "• I need favour in my business\n"
             "• I feel discouraged\n"
             "• I need spiritual growth\n"
             "• I need restoration\n"
