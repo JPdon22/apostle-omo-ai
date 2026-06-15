@@ -100,14 +100,12 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     else:
         response = (
-            "🙏 I couldn't find a specific message for that yet.\n\n"
-            "Try describing your situation differently.\n\n"
-            "For example:\n"
-            "• I need favour in my business\n"
-            "• I feel discouraged\n"
+            "🙏 I couldn’t find an exact match for that.\n\n"
+            "Try describing it differently like:\n"
+            "• I need breakthrough in my career\n"
+            "• I feel stuck in life\n"
+            "• I need favour in business\n"
             "• I need spiritual growth\n"
-            "• I need restoration\n"
-            "• I need breakthrough"
         )
 
     await update.message.reply_text(response)
