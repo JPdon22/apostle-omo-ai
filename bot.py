@@ -1,15 +1,19 @@
-import os
-import random
-import re
-
 from telegram import Update
 from telegram.ext import (
     ApplicationBuilder,
     MessageHandler,
     CommandHandler,
-    ContextTypes,
     filters,
+    ContextTypes
 )
+
+import os
+import random
+import re
+import numpy as np
+
+from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
 
 from sermons import sermons
 
