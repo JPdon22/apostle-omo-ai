@@ -191,10 +191,10 @@ WELCOME_MESSAGE = """
 Tell me what you're going through and I will recommend relevant messages.
 
 Examples:
-- I need breakthrough
-- I feel stuck in life
-- I need favour in business
-- I need spiritual growth
+• I need breakthrough
+• I feel stuck in life
+• I need favour in business
+• I need spiritual growth
 
 You can also type /help anytime for guidance.
 """
@@ -203,9 +203,9 @@ HELP_MESSAGE = """
 ℹ️ How to use this bot:
 
 Just describe what you're going through in your own words, e.g.:
-- "I feel anxious about my finances"
-- "I need healing"
-- "I'm struggling in my marriage"
+• "I feel anxious about my finances"
+• "I need healing"
+• "I'm struggling in my marriage"
 
 I'll search for sermons that match what you shared.
 
@@ -229,10 +229,26 @@ UNSUPPORTED_MESSAGE = (
     "Please type out what you're going through, and I'll recommend a message for you."
 )
 
-# Quick greetings/short inputs that shouldn't go through the matcher
-GREETING_PATTERNS = {
-    "hi", "hello", "hey", "good morning", "good afternoon",
-    "good evening", "yo", "sup", "hiya", "howdy"
+GREETING_RESPONSE = (
+    "🙏 Hello! I'm here to recommend sermons based on what you're going through.\n\n"
+    "Just tell me how you're feeling or what you need, for example:\n"
+    "• I feel stuck in life\n"
+    "• I need a breakthrough\n"
+    "• I'm struggling in my marriage\n\n"
+    "Type /help anytime for more guidance."
+)
+
+# Quick greetings/small-talk/help phrases that shouldn't go through the matcher
+GREETING_KEYWORDS = {
+    "hi", "hello", "hey", "yo", "sup", "hiya", "howdy",
+    "good morning", "good afternoon", "good evening", "good day",
+    "morning", "evening", "afternoon",
+    "what can you do", "what do you do", "how does this work",
+    "how do you work", "what is this", "who are you",
+    "what are you", "help me", "how can you help",
+    "what can you help with", "are you a bot", "are you real",
+    "thanks", "thank you", "thx", "ok", "okay", "cool", "nice",
+    "test", "testing"
 }
 
 
@@ -299,6 +315,30 @@ def find_matching_sermons(user_message: str, exclude_links=None):
 
 
 # =========================
+# GREETING / SMALL-TALK DETECTION
+# =========================
+def is_greeting_or_smalltalk(user_message: str) -> bool:
+    clean_check = re.sub(r"[^\w\s]", "", user_message.lower()).strip()
+    clean_check = re.sub(r"\s+", " ", clean_check)
+
+    if not clean_check or len(clean_check) < 3:
+        return True
+
+    if clean_check in GREETING_KEYWORDS:
+        return True
+
+    for phrase in GREETING_KEYWORDS:
+        if (
+            clean_check == phrase
+            or clean_check.startswith(phrase + " ")
+            or clean_check.endswith(" " + phrase)
+        ):
+            return True
+
+    return False
+
+
+# =========================
 # COMMAND HANDLERS
 # =========================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -345,15 +385,10 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     user = update.effective_user
-    clean_check = re.sub(r"[^\w\s]", "", user_message.lower()).strip()
 
-    # Handle greetings / very short inputs without running the matcher
-    if clean_check in GREETING_PATTERNS or len(clean_check) < 3:
-        await update.message.reply_text(
-            "🙏 Hello! Tell me what you're going through "
-            "(e.g. \"I feel stuck in life\") and I'll recommend a message for you. "
-            "Type /help for more guidance."
-        )
+    # Catch greetings, small talk, and "what can you do?" style questions
+    if is_greeting_or_smalltalk(user_message):
+        await update.message.reply_text(GREETING_RESPONSE)
         return
 
     matched_sermons, top_score = find_matching_sermons(user_message)
