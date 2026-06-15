@@ -10,7 +10,6 @@ from telegram.ext import (
 import os
 import random
 import re
-import numpy as np
 
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -25,7 +24,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 
 # =========================
-# AI MODEL (LOAD FIRST)
+# LOAD AI MODEL (MUST BE FIRST)
 # =========================
 model = SentenceTransformer("all-MiniLM-L6-v2", cache_folder="/tmp")
 
@@ -44,16 +43,15 @@ for sermon in sermon_store:
 # WELCOME MESSAGE
 # =========================
 WELCOME_MESSAGE = """
-🙏 Welcome to Apostle Omo's A.I.
+🙏 Welcome to Apostle Omo's A.I
 
-Describe what you're going through and I’ll recommend relevant teachings.
+Tell me what you're going through and I will recommend relevant messages.
 
 Examples:
-• I need favour in business
-• I feel stuck in life
 • I need breakthrough
-• I feel spiritually down
-• I need restoration
+• I feel stuck in life
+• I need favour in business
+• I need spiritual growth
 """
 
 
@@ -91,21 +89,19 @@ def find_matching_sermons(user_message: str):
         )[0][0]
 
         # ---------------- FINAL SCORE ----------------
-        final_score = (0.45 * keyword_score) + (0.55 * semantic_score)
+        final_score = (0.4 * keyword_score) + (0.6 * semantic_score)
 
         scored.append((final_score, sermon))
-
-    if not scored:
-        return []
 
     scored.sort(reverse=True, key=lambda x: x[0])
 
     top_score = scored[0][0]
 
-    if top_score < 0.35:
+    # 🔥 LOWER THRESHOLD (FIX FOR YOUR ISSUE)
+    if top_score < 0.20:
         return []
 
-    best = [s for score, s in scored if abs(score - top_score) < 0.03]
+    best = [s for score, s in scored if abs(score - top_score) < 0.05]
 
     random.shuffle(best)
 
@@ -131,27 +127,27 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     matched_sermons = find_matching_sermons(user_message)
 
     if matched_sermons:
-        response = "📖 Here are some recommended messages for you:\n\n"
+        response = "📖 Here are recommended messages for you:\n\n"
 
-        seen_links = set()
+        seen = set()
 
         for sermon in matched_sermons:
-            if sermon["link"] in seen_links:
+            if sermon["link"] in seen:
                 continue
 
-            seen_links.add(sermon["link"])
+            seen.add(sermon["link"])
 
             response += f"✨ {sermon['title']}\n"
             response += f"{sermon['link']}\n\n"
 
     else:
         response = (
-            "🙏 I couldn’t find an exact match for that.\n\n"
-            "Try describing it differently like:\n"
-            "• I feel stuck in life\n"
+            "🙏 I couldn’t find a strong match yet.\n\n"
+            "Try saying:\n"
             "• I need breakthrough\n"
+            "• I feel stuck in life\n"
             "• I need favour in business\n"
-            "• I need spiritual growth\n"
+            "• I need spiritual growth"
         )
 
     await update.message.reply_text(response)
@@ -167,8 +163,4 @@ app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
 
 print("Apostle Omo's A.I is running...")
 
-app.run_polling(
-    poll_interval=3,
-    timeout=30,
-    bootstrap_retries=5
-)
+app.run_polling()
