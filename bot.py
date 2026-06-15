@@ -48,10 +48,10 @@ WELCOME_MESSAGE = """
 Tell me what you're going through and I will recommend relevant messages.
 
 Examples:
-• I need breakthrough
-• I feel stuck in life
-• I need favour in business
-• I need spiritual growth
+- I need breakthrough
+- I feel stuck in life
+- I need favour in business
+- I need spiritual growth
 """
 
 
@@ -80,7 +80,8 @@ def find_matching_sermons(user_message: str):
                 kw_tokens = set(kw.split())
                 keyword_score += len(kw_tokens & msg_tokens) * 0.3
 
-        keyword_score = min(keyword_score / 5, 1)
+        # 🔧 Reduced divisor so partial matches contribute more
+        keyword_score = min(keyword_score / 2, 1)
 
         # ---------------- SEMANTIC SCORE ----------------
         semantic_score = cosine_similarity(
@@ -89,16 +90,24 @@ def find_matching_sermons(user_message: str):
         )[0][0]
 
         # ---------------- FINAL SCORE ----------------
-        final_score = (0.4 * keyword_score) + (0.6 * semantic_score)
+        # 🔧 Increased semantic weight since natural language rarely
+        # matches keywords exactly
+        final_score = (0.2 * keyword_score) + (0.8 * semantic_score)
 
         scored.append((final_score, sermon))
 
     scored.sort(reverse=True, key=lambda x: x[0])
 
+    # 🔍 DEBUG: print top 5 scores so you can tune the threshold
+    print(f"\n--- Scores for: '{user_message}' ---")
+    for score, sermon in scored[:5]:
+        print(f"{score:.3f} - {sermon['title']}")
+    print("---------------------------------\n")
+
     top_score = scored[0][0]
 
-    # 🔥 LOWER THRESHOLD (FIX FOR YOUR ISSUE)
-    if top_score < 0.20:
+    # 🔧 Lowered threshold (tune further based on debug output above)
+    if top_score < 0.12:
         return []
 
     best = [s for score, s in scored if abs(score - top_score) < 0.05]
